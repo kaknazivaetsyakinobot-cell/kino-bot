@@ -10,7 +10,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # --- LOGGING VA SOZLAMALAR ---
 logging.basicConfig(level=logging.INFO)
-BOT_TOKEN = "8824099204:AAHbiBZxuiR6OFmQyzBcS9-BEeNSfbbHY_0"
+BOT_TOKEN = "8824099204:AAFLFHs7rnHxbrNNDgPI6XLsdbSoREKiRiM"
 ADMIN_ID = 8200259525
 DB_NAME = "movie_bot_pro.db"
 
