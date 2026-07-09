@@ -7,18 +7,17 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 # --- SOZLAMALAR ---
-BOT_TOKEN = "8824099204:AAETKSI7llQgIqZWnVfQZbLSzR5A1hTGCLo"
+BOT_TOKEN = "8824099204:AAHbiBZxuiR6OFmQyzBcS9-BEeNSfbbHY_0"
 ADMIN_ID = 8200259525
 CARD_INFO = "5614 6840 9146 5672 (ISMATULLAYEVA NOZANIN)"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# --- XOTIRA (Baza ulamaganimiz uchun bu yerda saqlanadi) ---
-db_referals = {} # {ref_id: {"name": name, "count": 0}}
-db_movies = {}   # {code: file_id}
+# --- XOTIRA (Baza ulanmagunicha) ---
+db_referals = {} 
+db_movies = {}   
 
-# --- HOLATLAR ---
 class States(StatesGroup):
     waiting_for_name = State()
     waiting_for_video = State()
@@ -42,13 +41,18 @@ def admin_menu():
     builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)
 
-# --- START ---
+# --- ASOSIY BUYRUQLAR ---
 @dp.message(Command("start"))
 async def start(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("👋 Xush kelibsiz! Kino kodini yuboring.", reply_markup=main_menu(message.from_user.id))
 
-# --- PREMIUM (CHEK TIZIMI) ---
+@dp.message(Command("cancel"))
+async def cancel(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Jarayon bekor qilindi.", reply_markup=main_menu(message.from_user.id))
+
+# --- PREMIUM CHEK ---
 @dp.message(F.text == "💎 Premium")
 async def premium(message: types.Message, state: FSMContext):
     await message.answer(f"💳 Karta: {CARD_INFO}\n📸 To'lov qilgach chekni rasm sifatida yuboring.")
@@ -58,17 +62,24 @@ async def premium(message: types.Message, state: FSMContext):
 async def check_receipt(message: types.Message, state: FSMContext):
     await bot.send_photo(ADMIN_ID, message.photo[-1].file_id, 
                          caption=f"🔔 Yangi chek! User: {message.from_user.full_name}\nID: {message.from_user.id}")
-    await message.answer("✅ Chek adminga yuborildi, kuting.")
+    await message.answer("✅ Chek adminga yuborildi.")
     await state.clear()
 
-# --- ADMIN REFERALLAR (RASMDAGIDEK) ---
+# --- ADMIN PANEL ---
 @dp.message(F.text == "📊 Boshqaruv", F.from_user.id == ADMIN_ID)
 async def admin(message: types.Message):
     await message.answer("Admin panel:", reply_markup=admin_menu())
 
+@dp.message(F.text == "⬅️ Orqaga")
+async def back(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer("🏠 Asosiy menyu", reply_markup=main_menu(message.from_user.id))
+
+# --- REFERALLAR (RO'YXAT) ---
 @dp.message(F.text == "🔗 Referallar", F.from_user.id == ADMIN_ID)
 async def ref_list(message: types.Message):
     builder = ReplyKeyboardBuilder()
+    # Har safar yangidan o'qiydi (qotib qolmaydi)
     for rid, data in db_referals.items():
         builder.button(text=f"📌 {data['name']} • 👥 {data['count']}")
     builder.button(text="➕ Havola yaratish")
@@ -88,7 +99,7 @@ async def save_ref(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Yaratildi: {message.text}", reply_markup=admin_menu())
     await state.clear()
 
-# --- KINO YUKLASH (QOTMAYDIGAN) ---
+# --- KINO YUKLASH (QOTMASDAN) ---
 @dp.message(F.text == "🎬 Kino yuklash", F.from_user.id == ADMIN_ID)
 async def upload_video(message: types.Message, state: FSMContext):
     await message.answer("Video yuboring:")
@@ -103,27 +114,21 @@ async def get_video(message: types.Message, state: FSMContext):
 @dp.message(States.waiting_for_code)
 async def get_code(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
-        await message.answer("❌ Faqat raqam!")
+        # Xato bo'lsa ham holatni buzmaydi
+        await message.answer("❌ Faqat raqamli kod kiriting!")
         return
     data = await state.get_data()
     db_movies[message.text] = data['file_id']
     await message.answer("✅ Saqlandi!", reply_markup=admin_menu())
     await state.clear()
 
-# --- /cancel (QOTISHLARNI YECHISH) ---
-@dp.message(Command("cancel"))
-async def cancel(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer("❌ Bekor qilindi.", reply_markup=main_menu(message.from_user.id))
-
 # --- QIDIRUV ---
 @dp.message(F.text.isdigit())
 async def search(message: types.Message):
-    code = message.text
-    if code in db_movies:
-        await message.answer_video(db_movies[code])
+    if message.text in db_movies:
+        await message.answer_video(db_movies[message.text])
     else:
-        await message.answer("❌ Bunday kod yo'q!")
+        await message.answer("❌ Bunday kod topilmadi.")
 
 async def main():
     await bot.delete_webhook(drop_pending_updates=True)
