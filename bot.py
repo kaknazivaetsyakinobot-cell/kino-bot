@@ -1,136 +1,146 @@
 import logging
 import asyncio
+import aiosqlite
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandStart, CommandObject
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
 
-# --- SOZLAMALAR ---
+# --- LOGGING VA SOZLAMALAR ---
+logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = "8824099204:AAHbiBZxuiR6OFmQyzBcS9-BEeNSfbbHY_0"
 ADMIN_ID = 8200259525
-CARD_INFO = "5614 6840 9146 5672 (ISMATULLAYEVA NOZANIN)"
+DB_NAME = "movie_bot_pro.db"
 
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 
-# --- XOTIRA (Baza ulanmagunicha) ---
-db_referals = {} 
-db_movies = {}   
+# --- DATABASE MANAGEMENT MODULE ---
+async def create_database_tables():
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, username TEXT)")
+        await db.execute("CREATE TABLE IF NOT EXISTS movies (code TEXT PRIMARY KEY, file_id TEXT, title TEXT)")
+        await db.execute("CREATE TABLE IF NOT EXISTS referals (ref_code TEXT PRIMARY KEY, name TEXT, count INTEGER DEFAULT 0)")
+        await db.commit()
 
-class States(StatesGroup):
-    waiting_for_name = State()
-    waiting_for_video = State()
-    waiting_for_code = State()
-    waiting_for_receipt = State()
+# --- FSM STATE CLASSES ---
+class FullBotStates(StatesGroup):
+    # Referral states
+    waiting_for_referral_name = State()
+    # Movie upload states
+    waiting_for_video_file = State()
+    waiting_for_video_code = State()
+    waiting_for_video_title = State()
 
-# --- KLAVIATURALAR ---
-def main_menu(user_id):
+# --- KEYBOARD BUILDER MODULE ---
+def get_main_keyboard(user_id):
     builder = ReplyKeyboardBuilder()
+    builder.button(text="🔍 Kino qidirish")
+    builder.button(text="👤 Profil")
     builder.button(text="💎 Premium")
     if user_id == ADMIN_ID:
-        builder.button(text="📊 Boshqaruv")
+        builder.button(text="⚙️ Admin Panel")
     builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)
 
-def admin_menu():
+def get_admin_keyboard():
     builder = ReplyKeyboardBuilder()
     builder.button(text="🎬 Kino yuklash")
-    builder.button(text="🔗 Referallar")
+    builder.button(text="🔗 Referallar ro'yxati")
+    builder.button(text="➕ Havola yaratish")
+    builder.button(text="📊 Statistika")
     builder.button(text="⬅️ Orqaga")
     builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)
 
-# --- ASOSIY BUYRUQLAR ---
-@dp.message(Command("start"))
-async def start(message: types.Message, state: FSMContext):
+# --- START COMMAND HANDLER ---
+@dp.message(CommandStart())
+async def handle_start(message: types.Message, command: CommandObject, state: FSMContext):
     await state.clear()
-    await message.answer("👋 Xush kelibsiz! Kino kodini yuboring.", reply_markup=main_menu(message.from_user.id))
+    user_id = message.from_user.id
+    args = command.args
 
-@dp.message(Command("cancel"))
-async def cancel(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer("❌ Jarayon bekor qilindi.", reply_markup=main_menu(message.from_user.id))
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
+        if args and args.startswith("ref_"):
+            await db.execute("UPDATE referals SET count = count + 1 WHERE ref_code = ?", (args,))
+        await db.commit()
 
-# --- PREMIUM CHEK ---
-@dp.message(F.text == "💎 Premium")
-async def premium(message: types.Message, state: FSMContext):
-    await message.answer(f"💳 Karta: {CARD_INFO}\n📸 To'lov qilgach chekni rasm sifatida yuboring.")
-    await state.set_state(States.waiting_for_receipt)
+    await message.answer("Assalomu alaykum! Kino kodini yuboring.", reply_markup=get_main_keyboard(user_id))
 
-@dp.message(States.waiting_for_receipt, F.photo)
-async def check_receipt(message: types.Message, state: FSMContext):
-    await bot.send_photo(ADMIN_ID, message.photo[-1].file_id, 
-                         caption=f"🔔 Yangi chek! User: {message.from_user.full_name}\nID: {message.from_user.id}")
-    await message.answer("✅ Chek adminga yuborildi.")
-    await state.clear()
+# --- ADMIN PANEL LOGIC ---
+@dp.message(F.text == "⚙️ Admin Panel", F.from_user.id == ADMIN_ID)
+async def admin_main(message: types.Message):
+    await message.answer("Admin boshqaruv tizimi:", reply_markup=get_admin_keyboard())
 
-# --- ADMIN PANEL ---
-@dp.message(F.text == "📊 Boshqaruv", F.from_user.id == ADMIN_ID)
-async def admin(message: types.Message):
-    await message.answer("Admin panel:", reply_markup=admin_menu())
-
-@dp.message(F.text == "⬅️ Orqaga")
-async def back(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer("🏠 Asosiy menyu", reply_markup=main_menu(message.from_user.id))
-
-# --- REFERALLAR (RO'YXAT) ---
-@dp.message(F.text == "🔗 Referallar", F.from_user.id == ADMIN_ID)
-async def ref_list(message: types.Message):
-    builder = ReplyKeyboardBuilder()
-    # Har safar yangidan o'qiydi (qotib qolmaydi)
-    for rid, data in db_referals.items():
-        builder.button(text=f"📌 {data['name']} • 👥 {data['count']}")
-    builder.button(text="➕ Havola yaratish")
-    builder.button(text="⬅️ Orqaga")
-    builder.adjust(1)
-    await message.answer("Ishchi referallar:", reply_markup=builder.as_markup(resize_keyboard=True))
-
+# --- REFERRAL LOGIC (DETAILED) ---
 @dp.message(F.text == "➕ Havola yaratish", F.from_user.id == ADMIN_ID)
-async def create_ref(message: types.Message, state: FSMContext):
-    await message.answer("Referal nomini yozing:")
-    await state.set_state(States.waiting_for_name)
+async def start_create_ref(message: types.Message, state: FSMContext):
+    await message.answer("Referal uchun ism yozing:")
+    await state.set_state(FullBotStates.waiting_for_referral_name)
 
-@dp.message(States.waiting_for_name)
-async def save_ref(message: types.Message, state: FSMContext):
-    ref_id = f"ref_{len(db_referals)+1}"
-    db_referals[ref_id] = {"name": message.text, "count": 0}
-    await message.answer(f"✅ Yaratildi: {message.text}", reply_markup=admin_menu())
+@dp.message(FullBotStates.waiting_for_referral_name, F.from_user.id == ADMIN_ID)
+async def process_create_ref(message: types.Message, state: FSMContext):
+    name = message.text
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute("SELECT COUNT(*) FROM referals")
+        res = await cursor.fetchone()
+        new_code = f"ref_{res[0] + 1}"
+        await db.execute("INSERT INTO referals (ref_code, name, count) VALUES (?, ?, 0)", (new_code, name))
+        await db.commit()
+    
+    bot_info = await bot.get_me()
+    await message.answer(f"Havola yaratildi: https://t.me/{bot_info.username}?start={new_code}")
     await state.clear()
 
-# --- KINO YUKLASH (QOTMASDAN) ---
+# --- MOVIE UPLOAD LOGIC (DETAILED) ---
 @dp.message(F.text == "🎬 Kino yuklash", F.from_user.id == ADMIN_ID)
-async def upload_video(message: types.Message, state: FSMContext):
-    await message.answer("Video yuboring:")
-    await state.set_state(States.waiting_for_video)
+async def start_upload(message: types.Message, state: FSMContext):
+    await message.answer("Kino faylini yuboring:")
+    await state.set_state(FullBotStates.waiting_for_video_file)
 
-@dp.message(States.waiting_for_video, F.video)
-async def get_video(message: types.Message, state: FSMContext):
+@dp.message(FullBotStates.waiting_for_video_file, F.video)
+async def process_upload_video(message: types.Message, state: FSMContext):
     await state.update_data(file_id=message.video.file_id)
-    await message.answer("Kodini yozing:")
-    await state.set_state(States.waiting_for_code)
+    await message.answer("Kino uchun kodni yozing:")
+    await state.set_state(FullBotStates.waiting_for_video_code)
 
-@dp.message(States.waiting_for_code)
-async def get_code(message: types.Message, state: FSMContext):
-    if not message.text.isdigit():
-        # Xato bo'lsa ham holatni buzmaydi
-        await message.answer("❌ Faqat raqamli kod kiriting!")
+@dp.message(FullBotStates.waiting_for_video_code)
+async def process_upload_code(message: types.Message, state: FSMContext):
+    code = message.text
+    if not code.isdigit():
+        await message.answer("Faqat raqam yozing!")
         return
     data = await state.get_data()
-    db_movies[message.text] = data['file_id']
-    await message.answer("✅ Saqlandi!", reply_markup=admin_menu())
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("INSERT OR REPLACE INTO movies (code, file_id) VALUES (?, ?)", (code, data['file_id']))
+        await db.commit()
+    await message.answer("Saqlandi!", reply_markup=get_admin_keyboard())
     await state.clear()
 
-# --- QIDIRUV ---
+# --- SEARCH LOGIC ---
 @dp.message(F.text.isdigit())
-async def search(message: types.Message):
-    if message.text in db_movies:
-        await message.answer_video(db_movies[message.text])
+async def handle_search(message: types.Message, state: FSMContext):
+    await state.clear()
+    async with aiosqlite.connect(DB_NAME) as db:
+        cur = await db.execute("SELECT file_id FROM movies WHERE code = ?", (message.text,))
+        res = await cur.fetchone()
+    
+    if res:
+        await message.answer_video(res[0], caption=f"Topildi: {message.text}")
     else:
-        await message.answer("❌ Bunday kod topilmadi.")
+        await message.answer("Bunday kod yo'q!")
+
+# --- MISC HANDLERS ---
+@dp.message(Command("cancel"))
+async def cancel_process(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer("Bekor qilindi.", reply_markup=get_main_keyboard(message.from_user.id))
 
 async def main():
+    await create_database_tables()
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
