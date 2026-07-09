@@ -10,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 logging.basicConfig(level=logging.INFO)
 
 # ----------------- ASOSIY SOZLAMALAR -----------------
-BOT_TOKEN = "8824099204:AAEs2Gf8J_j6LeHgZdy81HCQbf-b5fCo1uQ"
+BOT_TOKEN = "8824099204:AAH-rHIOhXiNP8T6C37hDpE-RYHRQ-6a1-A"
 ADMIN_ID = 8200259525  # Mashhurbek profili
 
 bot = Bot(token=BOT_TOKEN)
