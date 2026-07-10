@@ -1,64 +1,60 @@
-from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+import asyncio
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
-# Bot tokeni va adminlar ro'yxati
+# --- KONFIGURATSIYA ---
 API_TOKEN = '8824099204:AAGO_NnBzeybeQKog-i9bh0GrfG9mQ4AXsw'
-ADMIN_IDS = [ 7873870779,8994639797 ,8200259525] # 3 ta admin ID
+OWNER_ID = 8200259525 # O'z ID raqamingni shu yerga yoz
 
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
-# Tugmalar tartibi
-main_kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2).add(
-    KeyboardButton("📊 Statistika"), KeyboardButton("✉️ Xabar yuborish"),
-    KeyboardButton("🎬 Kontent boshqaruvi"), KeyboardButton("🔑 Kanallar"),
-    KeyboardButton("⚙️ Tizim sozlamalari"), KeyboardButton("📥 So'rovlar"),
-    KeyboardButton("🔙 Orqaga"), KeyboardButton("👥 Foydalanuvchilar")
-)
+# --- RUXSATLARNI TEKSHIRISH ---
+def is_owner(user_id):
+    return user_id == OWNER_ID
 
-content_kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2).add(
-    KeyboardButton("🎬 Kinolar"), KeyboardButton("📮 Postlar"),
-    KeyboardButton("🔗 Referal"), KeyboardButton("🔙 Asosiy panel")
-)
+# --- KEYBOARDS ---
+def admin_menu():
+    kb = ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="📊 Statistika"), KeyboardButton(text="📩 Xabar yuborish")],
+        [KeyboardButton(text="🎬 Kontent boshqaruvi"), KeyboardButton(text="🔑 Kanallar")],
+        [KeyboardButton(text="⚙️ Tizim sozlamalari"), KeyboardButton(text="📥 So'rovlar")],
+        [KeyboardButton(text="👥 Foydalanuvchilar")]
+    ], resize_keyboard=True)
+    return kb
 
-movies_kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2).add(
-    KeyboardButton("📥 Kino yuklash"), KeyboardButton("📝 Kino tahrirlash"),
-    KeyboardButton("🗑 Kino o'chirish"), KeyboardButton("📋 Kinolar ro'yxati"),
-    KeyboardButton("🔙 Orqaga")
-)
-
-# Admin tekshiruvi funksiyasi
-def is_admin(user_id):
-    return user_id in ADMIN_IDS
-
-# Bot komandalari va handlerlar
-@dp.message_handler(commands=['start', 'admin'])
+# --- HANDLERS ---
+@dp.message(Command("start"))
 async def start_handler(message: types.Message):
-    if is_admin(message.from_user.id):
-        await message.answer("Admin paneliga xush kelibsiz!", reply_markup=main_kb)
-    else:
-        await message.answer("Botga xush kelibsiz!")
+    await message.answer("Admin paneliga xush kelibsiz!", reply_markup=admin_menu())
 
-@dp.message_handler(text="🎬 Kontent boshqaruvi")
-async def content_handler(message: types.Message):
-    if is_admin(message.from_user.id):
-        await message.answer("Kontent bo'limiga xush kelibsiz:", reply_markup=content_kb)
-
-@dp.message_handler(text="🎬 Kinolar")
-async def movies_handler(message: types.Message):
-    if is_admin(message.from_user.id):
-        await message.answer("Kinolar bo'limidasiz:", reply_markup=movies_kb)
-
-@dp.message_handler(text="🔑 Kanallar")
+@dp.message(F.text == "🔑 Kanallar")
 async def channels_handler(message: types.Message):
-    if is_admin(message.from_user.id):
-        await message.answer("🔑 Kanallar bo'limi (Majburiy obuna sozlamalari).")
+    if not is_owner(message.from_user.id):
+        await message.answer("❌ Sizda ushbu bo'limga kirish uchun ruxsat yo'q!")
+        return
+    await message.answer("🔐 Kanallar sozlamalari (Faqat siz uchun ochiq).")
 
-@dp.message_handler(text="🔙 Asosiy panel")
-@dp.message_handler(text="🔙 Orqaga")
-async def back_handler(message: types.Message):
-    if is_admin(message.from_user.id):
-        await message.answer("Admin paneliga xush kelibsiz!", reply_markup=main_kb)
+@dp.message(F.text == "📥 So'rovlar")
+async def requests_handler(message: types.Message):
+    if not is_owner(message.from_user.id):
+        await message.answer("❌ Sizda ushbu bo'limga kirish uchun ruxsat yo'q!")
+        return
+    await message.answer("📥 So'rovlar bo'limi (Avto tasdiqlash holati: O'chiq).")
 
-if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+@dp.message(F.text == "🎬 Kontent boshqaruvi")
+async def content_handler(message: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Yangi post yaratish", callback_data="add_post")],
+        [InlineKeyboardButton(text="🎬 Kinolar ro'yxati", callback_data="list_movies")]
+    ])
+    await message.answer("🎬 Kontent bo'limiga xush kelibsiz:", reply_markup=kb)
+
+# --- BOTNI ISHGA TUSHIRISH ---
+async def main():
+    print("Bot muvaffaqiyatli ishga tushdi...")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
