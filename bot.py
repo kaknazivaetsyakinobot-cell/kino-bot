@@ -14,8 +14,8 @@ from aiogram.types import (
 
 logging.basicConfig(level=logging.INFO)
 
-TOKEN = "SIZNING_BOT_TOKENINGIZ"
-ADMIN_ID = 123456789
+TOKEN = "8938258523:AAGBNl2oBfvxckalfsZEMEPIZ1erqA-QO6E"
+ADMIN_ID = 8159829976
 
 bot = Bot(token=TOKEN)
 router = Router()
