@@ -12,24 +12,20 @@ from aiogram.types import (
     Message,
 )
 
-# Logging sozlamasi
 logging.basicConfig(level=logging.INFO)
 
-# Tokeningiz va Admin ID raqamingizni shu yerga yozing
-TOKEN = "8938258523:AAFz7tEXBTb28bZrsFdivjl8vgD_l0iUMl4"
-ADMIN_ID = (8159829976) # O'z Telegram ID raqamingizni yozing (masalan: 582910492)
+TOKEN = "SIZNING_BOT_TOKENINGIZ"
+ADMIN_ID = 123456789
 
 bot = Bot(token=TOKEN)
 router = Router()
 
-# Global xotirada narx va balanslar (keyinchalik bazaga ulanadi)
 ADMIN_SETTINGS = {
     "price_per_star": 210,
-    "user_balance": 15000,  # Test balansi
+    "user_balance": 15000,
 }
 
 
-# FSM Holatlari (Qadamlar)
 class OrderState(StatesGroup):
     waiting_for_username = State()
     waiting_for_custom_amount = State()
@@ -38,14 +34,9 @@ class OrderState(StatesGroup):
     admin_add_balance = State()
 
 
-# ---------------------------------------------------------
-# 1. /START KOMANDASI (ASOSIY MENYU VA ADMIN TUGMA)
-# ---------------------------------------------------------
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
-
-    # Foydalanuvchi admin ekanligini tekshirish
     is_admin = message.from_user.id == ADMIN_ID
 
     text = (
@@ -68,7 +59,7 @@ async def cmd_start(message: Message, state: FSMContext):
                 text="🎁 𝐺𝐼𝐹𝑇 𝑂𝐿𝐼𝑆𝐻", callback_data="menu_gift"
             ),
             InlineKeyboardButton(
-                text="🏆 𝑇𝑂𝑃 𝑅EY𝑇𝐼𝑁𝐺", callback_data="menu_top"
+                text="🏆 𝑇𝑂𝑃 𝑅𝐸𝑌𝑇𝐼𝑁𝐺", callback_data="menu_top"
             ),
         ],
         [
@@ -81,13 +72,12 @@ async def cmd_start(message: Message, state: FSMContext):
         ],
         [
             InlineKeyboardButton(
-                text=f"💳 𝐵𝐴𝐿𝐴Ն𝑆: {ADMIN_SETTINGS['user_balance']:,} 𝑠𝑜'𝑚",
+                text=f"💳 𝐵𝐴𝐿𝐴𝑁𝑆: {ADMIN_SETTINGS['user_balance']:,} 𝑠𝑜'𝑚",
                 callback_data="menu_balance",
             )
         ],
     ]
 
-    # Agar foydalanuvchi admin bo'lsa, maxsus admin panel tugmasini qo'shamiz
     if is_admin:
         keyboard_buttons.append(
             [
@@ -101,9 +91,6 @@ async def cmd_start(message: Message, state: FSMContext):
     await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
-# ---------------------------------------------------------
-# 2. STARS OLISH MENYUSI (USERNAME SO'RASH) VA "O'ZIM UCHUN"
-# ---------------------------------------------------------
 @router.callback_query(F.data == "menu_stars")
 async def stars_menu(callback: CallbackQuery, state: FSMContext):
     await state.set_state(OrderState.waiting_for_username)
@@ -133,7 +120,6 @@ async def stars_menu(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# "O'zim uchun" tugmasi bosilganda avtomatik o'z username'ini oladi
 @router.callback_query(F.data == "for_myself")
 async def for_myself_handler(callback: CallbackQuery, state: FSMContext):
     username = (
@@ -144,7 +130,7 @@ async def for_myself_handler(callback: CallbackQuery, state: FSMContext):
     await state.update_data(username=username)
 
     search_msg = await callback.message.answer(
-        "<b>𝐹𝑜𝑦𝑑𝑎𝑙𝑎𝑛𝑢𝑣𝑐ℎ𝑖  𝑞𝑖𝑑𝑖𝑟𝑖𝑙𝑚𝑜𝑞𝑑𝑎</b>🔍", parse_mode=ParseMode.HTML
+        "<b>𝐹𝑜𝑦𝑑𝑎𝑙𝑎𝑛𝑢𝑣𝑐ℎ𝗶  𝑞𝑖𝑑𝑖𝑟𝑖𝑙𝑚𝑜𝑞𝑑𝑎</b>🔍", parse_mode=ParseMode.HTML
     )
     await asyncio.sleep(1.2)
     await search_msg.delete()
@@ -153,16 +139,13 @@ async def for_myself_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# ---------------------------------------------------------
-# 3. USERNAME QABUL QILISH VA MIQDOR TANLASHGA O'TISH
-# ---------------------------------------------------------
 @router.message(OrderState.waiting_for_username)
 async def process_username(message: Message, state: FSMContext):
     username = message.text
     await state.update_data(username=username)
 
     search_msg = await message.answer(
-        "<b>𝐹𝑜𝑦𝑑𝑎𝑙𝑎𝑛𝑢𝑣𝑐ℎ𝑖  𝑞𝑖𝑑𝑖𝑟𝑖𝑙𝑚𝑜𝑞𝑑𝑎</b>🔍", parse_mode=ParseMode.HTML
+        "<b>𝐹𝑜𝑦𝑑𝑎𝑙𝑎𝑛𝑢𝑣𝑐ℎ𝗶  𝑞𝑖𝑑𝑖𝑟𝑖𝑙𝑚𝑜𝑞𝑑𝑎</b>🔍", parse_mode=ParseMode.HTML
     )
     await asyncio.sleep(1.2)
     await search_msg.delete()
@@ -172,37 +155,37 @@ async def process_username(message: Message, state: FSMContext):
 
 async def show_amount_selection(message: Message, username: str, state: FSMContext):
     text = (
-        f"⭐ <b>𝑇𝑒𝑙𝑒𝑔𝑟𝗮𝗺  𝑆𝑡𝑎𝑟𝑠  𝑏𝑢𝑦𝑢𝑟𝑡𝑚𝑎</b>\n\n"
+        f"⭐ <b>𝑇𝑒𝑙𝑒𝑔𝗿𝗮𝗺  𝑆𝑡𝑎𝑟𝑠  𝑏𝑢𝑦𝑢𝑟𝑡𝑚𝑎</b>\n\n"
         f"👤 <b>𝑄𝑎𝑏𝑢𝑙  𝑞𝑖𝑙𝑢𝑣𝑐ℎ𝑖:</b> {username}\n\n"
         f"🔻 <b>𝑀𝑖𝑛𝑖𝑚𝑎𝑙:</b> 50\n"
-        f"🔺 <b>𝑀𝑎𝑘𝑠𝑖𝑚𝑎𝑙:</b> 480\n\n"
-        f"⭐ <b>𝐾𝑒𝑟𝑎𝑘𝑙𝑖  𝑆𝑡𝑎𝑟𝑠  𝗺𝗶𝗾𝗱𝗼𝗿𝗶𝗻𝗶  𝘁𝗮𝗻𝗹𝗮𝗻𝗴  𝘆𝗼𝗸𝑖  𝗿𝗮𝗾𝗮𝗺  𝗯𝗶𝗹𝗮𝗻  𝘆𝘂𝗯𝗼𝗿𝗶𝗻𝗴:</b>"
+        f"🔺 <b>𝑀𝑎𝑘𝑠𝑖𝑚𝑎𝑙:</b> 10000\n\n"
+        f"⭐ <b>𝐾𝑒𝑟𝑎𝑘𝑙𝑖  𝑆𝑡𝑎𝑟𝑠  𝗺𝗶𝗾𝗱𝗼𝗿𝗶𝗻𝗶  𝘁𝗮𝗻𝗹𝗮𝗻𝗴  𝘆𝑜𝗸𝑖  𝗿𝗮𝗾𝗮𝗺  𝗯𝗶𝗹𝗮𝗻  𝘆𝘂𝗯𝗼𝗿𝗶𝗻𝗴:</b>"
     )
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="50 stars ✖️", callback_data="amount_50"
+                    text="50 stars ⭐", callback_data="amount_50"
                 ),
                 InlineKeyboardButton(
-                    text="100 stars ✖️", callback_data="amount_100"
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="200 stars ✖️", callback_data="amount_200"
-                ),
-                InlineKeyboardButton(
-                    text="250 stars ✖️", callback_data="amount_250"
+                    text="100 stars ⭐", callback_data="amount_100"
                 ),
             ],
             [
                 InlineKeyboardButton(
-                    text="500 stars ✖️", callback_data="amount_500"
+                    text="200 stars ⭐", callback_data="amount_200"
                 ),
                 InlineKeyboardButton(
-                    text="1000 stars ✖️", callback_data="amount_1000"
+                    text="250 stars ⭐", callback_data="amount_250"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="500 stars ⭐", callback_data="amount_500"
+                ),
+                InlineKeyboardButton(
+                    text="1000 stars ⭐", callback_data="amount_1000"
                 ),
             ],
             [
@@ -222,12 +205,14 @@ async def show_amount_selection(message: Message, username: str, state: FSMConte
     await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
-# ---------------------------------------------------------
-# 4. TAYYOR TUGMALARDAN BIRINI BOSGANDA (50, 100 va hokazo)
-# ---------------------------------------------------------
 @router.callback_query(F.data.startswith("amount_"))
 async def process_preset_amount(callback: CallbackQuery, state: FSMContext):
     amount = int(callback.data.split("_")[1])
+    
+    if amount < 50:
+        await callback.answer("⚠️ Minimal miqdor 50 tadan kam bo'lmasligi kerak!", show_alert=True)
+        return
+
     price_per_star = ADMIN_SETTINGS["price_per_star"]
     total_price = amount * price_per_star
     user_balance = ADMIN_SETTINGS["user_balance"]
@@ -244,11 +229,11 @@ async def process_preset_amount(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(text, parse_mode=ParseMode.HTML)
     else:
         text = (
-            f"⭐ <b>𝐵𝑢𝑦𝑢𝑟𝑡𝑚𝑎𝑛𝑖  𝘁𝗮𝘀𝗱𝗶𝗾𝗹𝗮𝗻𝗴</b>\n\n"
+            f"⭐ <b>𝐵𝑢𝑦𝑢𝑟𝑡𝑚𝑎𝑛𝑖  𝘁𝗮𝘀𝗱𝑖𝑞𝗹𝗮𝗻𝗴</b>\n\n"
             f"👤 <b>𝑄𝑎𝑏𝑢𝑙  𝑞𝑖𝑙𝑢𝑣𝑐ℎ𝑖:</b> {username}\n"
             f"⭐ <b>𝑆𝑡𝑎𝑟𝑠:</b> {amount}\n"
             f"💰 <b>𝑁𝑎𝑟𝑥:</b> {total_price:,} 𝑠𝑜'𝑚\n"
-            f"👛 <b>𝐵𝑎𝗹𝗮𝗻𝘀𝑖𝑛𝗴𝑖𝘇:</b> Eтарли (Аноним аккаунтдан ечилиди)"
+            f"👛 <b>𝐵𝗮𝗹𝗮𝗻𝘀𝑖𝑛𝗴𝑖𝘇:</b> Yetarli"
         )
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -270,9 +255,6 @@ async def process_preset_amount(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# ---------------------------------------------------------
-# 5. BOSHQA QIYMAT BOSILGANDA
-# ---------------------------------------------------------
 @router.callback_query(F.data == "custom_amount")
 async def custom_amount_handler(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -281,11 +263,11 @@ async def custom_amount_handler(callback: CallbackQuery, state: FSMContext):
 
     await state.set_state(OrderState.waiting_for_custom_amount)
     text = (
-        f"⭐ <b>𝑇𝑒𝑙𝑒𝑔𝗿𝗮𝗺  𝑆𝑡𝑎𝑟𝑠  𝘅𝗮𝗿𝗶𝗱  𝗾𝗶𝗹𝗶𝘀ℎ</b>\n\n"
+        f"⭐ <b>𝑇𝑒𝑙𝑒𝑔𝗿𝗮𝗺  𝑆𝑡ᱟ𝑟𝑠  𝘅𝗮𝗿𝗶𝗱  𝗾𝗶𝗹𝗶𝘀ℎ</b>\n\n"
         f"👤 <b>𝑄𝑎𝑏𝑢𝑙  𝑞𝑖𝑙𝑢𝑣𝑐ℎ𝑖:</b> {username}\n"
         f"💰 <b>1 𝑆𝑡𝑎𝑟𝑠 = {price} 𝑠𝑜'𝑚</b>\n\n"
         f"<b>𝑁𝑒𝗰𝗵𝗮  𝑆𝑡𝑎𝑟𝑠  𝘅𝗮𝗿𝗶𝗱  𝗾𝗶𝗹𝗺𝗼𝗾𝗰𝗵𝗶𝘀𝗶𝘇?</b>\n"
-        f"𝑀𝑖𝑛𝑖𝑚𝑎𝑙: 50, 𝑀𝑎𝑘𝑠𝑖𝑚𝑎𝑙: 483\n"
+        f"Minimal: 50 ta\n"
         f"<b>𝑀𝑖𝑞𝑑𝑜𝑟𝑛𝑖  𝑘𝑖𝑟𝑖𝑡𝑖𝑛𝑔:</b>"
     )
 
@@ -304,18 +286,23 @@ async def custom_amount_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# ---------------------------------------------------------
-# 6. QO'LDA KIRITILGAN MIQDORNI QABUL QILISH VA TEKSHIRISH
-# ---------------------------------------------------------
 @router.message(OrderState.waiting_for_custom_amount)
 async def process_custom_amount(message: Message, state: FSMContext):
     if not message.text.isdigit():
         await message.answer(
-            "⚠️ <b>𝐼𝑙𝑡𝑖𝑚𝑜𝑠, 𝑓𝑎𝑞𝑎𝑡 𝑟𝑎𝑞𝑎𝗺 𝑘𝑖𝑟𝑖𝑡𝑖𝑛𝑔!</b>", parse_mode=ParseMode.HTML
+            "⚠️ <b>𝐼𝑙𝑡𝑖𝑚𝑜𝑠, 𝑓𝑎𝑞𝑎𝑡 𝑟𝑎𝑞𝗮𝗺 𝑘𝑖𝑟𝑖𝑡𝑖𝑛𝑔!</b>", parse_mode=ParseMode.HTML
         )
         return
 
     amount = int(message.text)
+
+    if amount < 50:
+        await message.answer(
+            "⚠️ <b>Minimal miqdor 50 tadan kam bo'lmasligi kerak! Iltimos, 50 yoki undan ko'p kiriting.</b>", 
+            parse_mode=ParseMode.HTML
+        )
+        return
+
     price_per_star = ADMIN_SETTINGS["price_per_star"]
     total_price = amount * price_per_star
     user_balance = ADMIN_SETTINGS["user_balance"]
@@ -332,11 +319,11 @@ async def process_custom_amount(message: Message, state: FSMContext):
         await message.answer(text, parse_mode=ParseMode.HTML)
     else:
         text = (
-            f"⭐ <b>𝐵𝑢𝑦𝑢𝑟𝑡𝑚𝑎𝑛𝑖  𝘁𝗮𝘀𝗱𝑖𝑞𝗹𝑎𝗻𝗴</b>\n\n"
+            f"⭐ <b>𝐵𝑢𝑦𝑢𝑟𝑡𝑚𝑎𝑛𝑖  𝘁𝗮𝘀𝗱𝑖𝑞𝗹𝗮𝗻𝗴</b>\n\n"
             f"👤 <b>𝑄𝑎𝑏𝑢𝑙  𝑞𝑖𝑙𝑢𝑣𝑐ℎ𝑖:</b> {username}\n"
             f"⭐ <b>𝑆𝑡𝑎𝑟𝑠:</b> {amount}\n"
             f"💰 <b>𝑁𝑎𝑟𝑥:</b> {total_price:,} 𝑠𝑜'𝑚\n"
-            f"👛 <b>𝐵𝗮𝗹𝗮𝗻𝘀𝑖𝑛𝗴𝑖𝘇:</b> Eтарли (Аноним аккаунтдан ечилиди)"
+            f"👛 <b>𝐵𝗮𝗹𝗮𝗻𝘀𝑖𝑛𝗴𝑖𝘇:</b> Yetarli"
         )
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -357,9 +344,6 @@ async def process_custom_amount(message: Message, state: FSMContext):
         )
 
 
-# ---------------------------------------------------------
-# 7. ADMIN PANEL BOSHQARUVI
-# ---------------------------------------------------------
 @router.callback_query(F.data == "admin_panel")
 async def admin_panel_handler(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
@@ -474,9 +458,6 @@ async def save_new_balance(message: Message, state: FSMContext):
     )
 
 
-# ---------------------------------------------------------
-# 8. ORQAGA VA QOLGAN TUGMALARNI BOSHQARISH
-# ---------------------------------------------------------
 @router.callback_query(
     F.data.in_(
         {
@@ -507,9 +488,6 @@ async def sub_menus(callback: CallbackQuery, state: FSMContext):
         )
 
 
-# ---------------------------------------------------------
-# BOTNI ISHGA TUSHIRISH
-# ---------------------------------------------------------
 async def main():
     dp = Dispatcher()
     dp.include_router(router)
