@@ -17,8 +17,7 @@ logging.basicConfig(level=logging.INFO)
 
 # Tokeningiz va Admin ID raqamingizni shu yerga yozing
 TOKEN = "8938258523:AAFz7tEXBTb28bZrsFdivjl8vgD_l0iUMl4"
-ADMIN_ID = 8159829976 # O'z Telegram ID raqamingizni yozing (masalan: 582910492)
-)
+ADMIN_ID = (8159829976) # O'z Telegram ID raqamingizni yozing (masalan: 582910492)
 
 bot = Bot(token=TOKEN)
 router = Router()
